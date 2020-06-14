@@ -7,7 +7,7 @@ library(RColorBrewer)
 AddTrip <- function(olddata, newloc, travelname, save = FALSE)
 {
   if(is.null(olddata) == T)
-    olddata <- readRDS("C:/Users/eugen/Dropbox/My/My App/TravelApp/TripInfor.rds")
+    olddata <- readRDS("~/GitHub/TravelApp/TripInfor.rds")
   temp <- ggmap::geocode(newloc)
   newdata <- data.frame(name = newloc, 
                         lng = temp$lon, lat = temp$lat, 
@@ -15,15 +15,15 @@ AddTrip <- function(olddata, newloc, travelname, save = FALSE)
   comb <- rbind(olddata, newdata)
   if(save == TRUE)
   {
-    saveRDS(comb, "C:/Users/eugen/Dropbox/My/My App/TravelApp/TripInfor.rds")
+    saveRDS(comb, "~/GitHub/TravelApp/TripInfor.rds")
     for(i in 1:length(newloc))
     {
-      paths = paste("C:/Users/eugen/Dropbox/My/My App/TravelApp/www/photo/", newloc, sep = "")
+      paths = paste("~/GitHub/TravelApp/www/photo/", newloc, sep = "")
       if(dir.exists(paths[i]) == 0)
-         dir.create(paths[i])
+        dir.create(paths[i])
     }
   }
-    
+  
   return(comb)
 }
 
@@ -34,7 +34,7 @@ GetRouteline <- function(TripInfor, save = FALSE)
     purrr::map(., .f = function(x) osrmTrip(x, returnclass="sf", overview = "full")) %>% 
     purrr::map(., .f = function(x) x[[1]]$trip %>% sf::st_coordinates() %>% data.frame())
   if(save == TRUE)
-    saveRDS(Route, "C:/Users/eugen/Dropbox/My/My App/TravelApp/RouteLine.rds")
+    saveRDS(Route, "~/GitHub/TravelApp/RouteLine.rds")
   return(Route)
 }
 
@@ -62,21 +62,22 @@ DrawRoute <- function(map, Route, TripInfor)
                     style = list("font-weight" = "normal", padding = "3px 8px"),
                     textsize = "20px",
                     direction = "auto")) %>%
-      setView(-93.65, 42.0285, zoom = 3) 
+      setView(-93.65, 42.0285, zoom = 5) 
   }
   if(is.null(Route) == F)
   {
     SplitTrip <- TripInfor %>% split(., TripInfor$travel)
-    for(i in 1:length(Route))
+    for(i in 1:length(SplitTrip))
     {
-      mymap %>% addPolylines(lng = Route[[i]]$X, lat = Route[[i]]$Y, weight = 2.5) %>%
-        addCircleMarkers(lat = SplitTrip[[i]]$lat,
-                         lng = SplitTrip[[i]]$lng,
-                         popup = paste(SplitTrip[[i]]$travel, SplitTrip[[i]]$name, sep = "-"),
-                         color = rainbow(7)[i%%7],
-                         stroke = FALSE,
-                         radius = 4,
-                         fillOpacity = 0.8) -> mymap
+      mymap %>% addPolylines(lng = Route[[i]]$X, lat = Route[[i]]$Y, weight = 3) %>%
+        addAwesomeMarkers(lat = SplitTrip[[i]]$lat,
+                          lng = SplitTrip[[i]]$lng,
+                          layerId = SplitTrip[[i]]$name,
+                          popup = SplitTrip[[i]]$name,
+                          icon =makeAwesomeIcon(icon = "car", 
+                                                markerColor = c("orange", "yellow", "green", "cadetblue", 
+                                                                "blue", "darkblue", "purple", "pink", "grey")[i%%9], 
+                                                iconColor = "white", library = "fa")) -> mymap
     }
   }
   return(mymap)
@@ -90,11 +91,11 @@ latlong2state <- function(pointsDF) {
   states <- map('state', fill=TRUE, col="transparent", plot=FALSE)
   IDs <- sapply(strsplit(states$names, ":"), function(x) x[1])
   states_sp <- maptools::map2SpatialPolygons(states, IDs=IDs,
-                                   proj4string=CRS("+proj=longlat +datum=WGS84"))
+                                             proj4string=CRS("+proj=longlat +datum=WGS84"))
   
   # Convert pointsDF to a SpatialPoints object 
   pointsSP <- sp::SpatialPoints(pointsDF, 
-                            proj4string=CRS("+proj=longlat +datum=WGS84"))
+                                proj4string=CRS("+proj=longlat +datum=WGS84"))
   
   # Use 'over' to get _indices_ of the Polygons object containing each point 
   indices <- sp::over(pointsSP, states_sp)
@@ -107,7 +108,7 @@ latlong2state <- function(pointsDF) {
 # combine the JPG files togethoer and save the picture under the same folder
 # if the picture already exist, then skip
 
-#   combinepicture(path = "C:/Users/eugen/Dropbox/My/My App/TravelApp/www/photo")
+#   combinepicture(path = "~/GitHub/TravelApp/www/photo")
 combinepicture <- function(path)
 {
   sf_name <- list.files(path)
@@ -119,7 +120,8 @@ combinepicture <- function(path)
     if(files %>% length() > 0)
     {
       files <- files[paste0(basename((files))) != "showplot.JPG"]  # remove the show plot 
-      height = ifelse(length(files) %% 3 ==0, length(files) %/% 3, length(files) %/% 3+1) *480
+      #height = ifelse(length(files) %% 3 ==0, length(files) %/% 3, length(files) %/% 3+1) *480
+      height = 960
       width = 1920
       jpeg(paste(subpath, "showplot.JPG", sep = "/"), width = width, height = height)
       filelist <- lapply(files, jpeg::readJPEG)
@@ -135,6 +137,9 @@ combinepicture <- function(path)
         plot(NA,xlim=0:1,ylim=0:1,xaxt="n",yaxt="n",bty="n")
         rasterImage(img,0,0,1,1)
       }
+      if(length(files) < 6)
+        for(i in (length(files)+1):6)
+          plot(NA,xlim=0:1,ylim=0:1,xaxt="n",yaxt="n",bty="n")
       dev.off()
     }
   }
