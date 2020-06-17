@@ -4,14 +4,22 @@ library(osrm)
 library(sf)
 library(RColorBrewer)
 # Load Trip Information Data and Add new ones
-AddTrip <- function(olddata, newloc, travelname, save = FALSE)
+AddTrip <- function(olddata, newloc, travelname, type, save = FALSE)
 {
   if(is.null(olddata) == T)
     olddata <- readRDS("~/GitHub/TravelApp/TripInfor.rds")
   temp <- ggmap::geocode(newloc)
   newdata <- data.frame(name = newloc, 
                         lng = temp$lon, lat = temp$lat, 
-                        travel = rep(travelname, length(newloc)))
+                        travel = rep(travelname, length(newloc)), 
+                        type = type)
+    # type: 1: National Park and other natural touristic spot
+    #       2: Museum
+    #       3: Airport
+    #       4: Restaurant
+    #       5: University
+    #       0: other
+    #       -1:Ames
   comb <- rbind(olddata, newdata)
   if(save == TRUE)
   {
@@ -22,6 +30,7 @@ AddTrip <- function(olddata, newloc, travelname, save = FALSE)
       if(dir.exists(paths[i]) == 0)
         dir.create(paths[i])
     }
+    GetRouteline(TripInfor, save = FALSE)
   }
   
   return(comb)
@@ -34,8 +43,12 @@ GetRouteline <- function(TripInfor, save = FALSE)
     purrr::map(., .f = function(x) osrmTrip(x, returnclass="sf", overview = "full")) %>% 
     purrr::map(., .f = function(x) x[[1]]$trip %>% sf::st_coordinates() %>% data.frame())
   if(save == TRUE)
+  {
     saveRDS(Route, "~/GitHub/TravelApp/RouteLine.rds")
-  return(Route)
+    return()
+  }
+  if(save == FALSE)
+    return(Route)
 }
 
 
@@ -66,7 +79,11 @@ DrawRoute <- function(map, Route, TripInfor)
   }
   if(is.null(Route) == F)
   {
-    SplitTrip <- TripInfor %>% split(., TripInfor$travel)
+    id <- data.frame(type = c(-1, 0, 1, 2, 3, 5), 
+                      icontype = c("home", "camera", "tree", "university",  "plane", "graduation-cap"))
+                    # icontype = rep("car", 6))
+    SplitTrip <- TripInfor %>% left_join(., id) %>% split(., TripInfor$travel) #
+    
     for(i in 1:length(SplitTrip))
     {
       mymap %>% addPolylines(lng = Route[[i]]$X, lat = Route[[i]]$Y, weight = 3) %>%
@@ -74,7 +91,7 @@ DrawRoute <- function(map, Route, TripInfor)
                           lng = SplitTrip[[i]]$lng,
                           layerId = SplitTrip[[i]]$name,
                           popup = SplitTrip[[i]]$name,
-                          icon =makeAwesomeIcon(icon = "car", 
+                          icon =makeAwesomeIcon(icon = SplitTrip[[i]]$icontype, 
                                                 markerColor = c("orange", "yellow", "green", "cadetblue", 
                                                                 "blue", "darkblue", "purple", "pink", "grey")[i%%9], 
                                                 iconColor = "white", library = "fa")) -> mymap
