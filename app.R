@@ -1,16 +1,22 @@
 library(shiny);library(shinycssloaders);library(shinydashboard);library(shinyWidgets)
-library(plotly);library(DT)
+library(plotly)
 library(leaflet);library(leaflet.extras)
 library(dplyr);library(sp);library(rgdal)
-#library(viscover)
+require(RCurl)
 
-setwd("C:/Users/eugen/Dropbox/My/My App/TravelApp/")
+
+
+setwd("~/GitHub/TravelApp/")
 source("BaseFun.R")
 TripInfor <- readRDS("TripInfor.rds")
 RouteLine <- readRDS("RouteLine.rds")
 NP <- read.csv("nps_parks.csv")
-plot_path <- "C:\\Users\\eugen\\Dropbox\\My\\My App\\TravelApp\\www\\photo"
+plot_path <- "~\\GitHub\\TravelApp\\www\\photo"
 plot_path2 <-  "C:/Users/eugen/Dropbox/My/My App/TravelApp/www/photo"
+
+
+
+
 ui <- dashboardPage(skin = "blue",
  dashboardHeader(title = "My Apps", titleWidth = 550, disable = FALSE),
  
@@ -19,60 +25,34 @@ ui <- dashboardPage(skin = "blue",
    sidebarMenu(
      # Setting id makes input$tabs give the tabName of currently-selected tab
      id = "tabs",
-     menuItem(text = "US Map", tabName = "dashboard", icon = icon("list-alt"),
-              badgeColor = "yellow"),
      menuItem(text = "Travel Histroy", icon = icon("th"), tabName = "widgets", # badgeLabel = "new",
-              badgeColor = "green"),
-     menuItem(text = "Design Travel Route", icon = icon("bar-chart-o"), 
-              tabname = "Plan",
-              badgeColor = "blue")
-              #menuSubItem("Sub-item 1", tabName = "subitem1"),
-              #menuSubItem("Sub-item 2", tabName = "subitem2")
-      ),
-   sidebarSearchForm(label = "Departure Address", 
-                     textId = "searchText", 
-                     buttonId = "searchButton"),
-   sidebarSearchForm(label = "Destination Address", 
-                     textId = "searchText", 
-                     buttonId = "searchButton")
-
+              badgeColor = "green")
+      )
  ),
  
  dashboardBody(
      tabItems(
-       tabItem(tabName = "dashboard",
-               fluidRow(
-                 box(width = 15,
-                     leafletOutput("statemap", width = "100%", height = 750)
-                    )
-                 )
-       ),
-       
+
        
        tabItem(tabName = "widgets",
                fluidRow(
-                 box(width = 10,
-                     leafletOutput("TravelMap", width = "100%", height = 450)),
+                 textInput("dep_ads", "Departure Address: ", "644 Squaw Creek Drive, Ames"), 
+                 textInput("dest_ads", "Destination Address: ", "Yellow Stone"), 
+                 
+                 box(width = 15,
+                     leafletOutput("TravelMap", width = "100%", height = 450),
+                     absolutePanel(top = 20, left = 50, 
+                                   column(width = 2, actionButton("draw_route", "GetRoute"))
+                                   )
+                     ),
                  hr(),
-                 box(title = "Gallery", status = "success", solidHeader = TRUE, width = 10, 
+                 box(title = "Gallery", status = "success", solidHeader = TRUE, width = 15, 
                      fluidRow(width = 10,
-                              plotOutput("plot_gallery", height = "100%") %>% withSpinner()
-                     )),
-                 hr(), hr(),
-                 tags$head(tags$script(src = "http://www.elevateweb.co.uk/wp-content/themes/radial/jquery.elevatezoom.min.js")),
-                 actionButton("myBtn", "Press Me for zoom!"), 
-                 uiOutput("myImage"),
-                 singleton(
-                   tags$head(tags$script('Shiny.addCustomMessageHandler("testmessage",
-  function(message) {
-    $("#myImage img").elevateZoom({scrollZoom : true});
-  }
-);')))
-               ),
-       ),
-       
-       tabItem(tabName = "Plan")
-
+                              uiOutput("plot_gallery",width = "100%")
+                     ))
+                 
+               )
+       )
      )
  )
 )
@@ -84,9 +64,8 @@ server <- function(input, output, session)
 {
 
   # the map of states, 
-  output$statemap <- renderLeaflet({
-    DrawRoute(NULL, NULL, TripInfor) %>%
-      addTiles(options = tileOptions(opacity = 0.8)) -> p
+  output$TravelMap <- renderLeaflet({
+    DrawRoute(NULL, NULL, TripInfor) -> p
     p <- p %>%
       addEasyButton(easyButton(
         icon="fa-crosshairs", title="Locate Me",                               #icon: start with "fa-"
@@ -109,100 +88,87 @@ server <- function(input, output, session)
     p
   })
 
-  # selectmarker <- reactiveValues(name = "Key West")
-  myplace_marker <- 
-    observeEvent(input$TravelMap_marker_click, { # update the location selectInput on map clicks
+  selectmarker <- reactiveValues(name = "Key_West")
+ 
+  # get the selected marker's name
+  observeEvent(input$TravelMap_marker_click, { # update the location selectInput on map clicks
     point <- input$TravelMap_marker_click
-    mymarker <- NULL
-    if(sum((TripInfor$lat == point$lat) * (TripInfor$lng == point$lng )) > 0)
-      mymarker <- TripInfor %>% filter(lng == point$lng, lat == point$lat) 
-    selectmarker <- data.frame(name = "Key West")
-    if(is.null(mymarker) == F)
+    sp <- data.frame(name = point$id %>% as.numeric())
+    if(inner_join(sp, TripInfor) %>% dim() %>% "["(1) > 0)
     {
-      selectmarker$name <- mymarker$name
-    }
-   # print(selectmarker)
-    selectmarker$name
-    # State <-  latlong2state(data.frame(x = point$lng, y = point$lat))
-  })
-  
-  # loc = reactiveValues(name = "Key West")
-  output$plot_gallery <- renderImage(
-    {# loc <- ifesle(is.null(myplace_marker()), "Key West", myplace_marker())
-    loc = "Key West"
-    oneplot = paste(plot_path, loc, "showplot.JPG", sep = "\\")
-    list(src = oneplot,
-         width = 400,
-         height = 300,
-         alt = "This is alternate text")
-    }, deleteFile = FALSE
-  )
-  
-  output$myImage <- renderUI({
-    loc = "Key West"
-    oneplot = paste(plot_path2, loc, "showplot.JPG", sep = "/")
-    img(src = "https://raw.githubusercontent.com/XiaodanLyu/viscover/master/figures/overlay-CDL2018.png",  
-        "data-zoom-image" = "https://raw.githubusercontent.com/XiaodanLyu/viscover/master/figures/overlay-CDL2018.png")
-  })
-  
-  observe({
-    if(input$myBtn > 0){
-      session$sendCustomMessage(type = 'testmessage',
-                                message = list())             
+      selectmarker$name <- sp$name
     }
   })
-
-  # add point infor record
-  # point_marker <- reactiveValues(lng = NULL, lat = NULL, Id = NULL)
-  # observeEvent(input$statemap_click,{
-  #   # Respond to "event-like" reactive inputs, values, and expressions.
-  #   click <- input$statemap_click                        # click point, the name is called as "xx_click" 
-  #   clng <- click$lng
-  #   clat <- click$lat
-  #   Id <- Sys.time() %>% as.character()
-  #   StateValue = latlong2state(data.frame(x = clng, y = clat))
-  # 
-  #   point_marker$lng = c(point_marker$lng, clng)
-  #   point_marker$lat = c(point_marker$lat, clat)
-  #   point_marker$Id = c(point_marker$Id, Id)
-  #   point_marker$state = c(point_marker$state, StateValue)
-  # 
-  #   leafletProxy("statemap") %>%
-  #   addAwesomeMarkers(
-  #     lng = clng, lat = clat, icon = makeAwesomeIcon(icon = "heart", markerColor = "orange"), layerId = Id, clusterId = "C",
-  #     label = HTML(
-  #       sprintf("<style>td{padding: 5px} </style>
-  #                  <table style = 'background:rgb(255,255,255)' border>
-  #                  <tr><td>Location</td><td>(%.4f, %.4f)</td></tr>
-  #                  <tr><td>State</td><td>%s</td></tr>
-  #                  </table>", clng, clat, StateValue )),
-  #     labelOptions = labelOptions(
-  #       offset = c(-80, -80), opacity = 1,
-  #       textOnly = T, textsize = "12px",
-  #       style = list("font-weight" = "bold",
-  #                    "float" = "left",
-  #                    "width" = "100%"))
-  #   )
-  # })
-  # 
-  # # remove the clicked marker 
-  # observeEvent(input$statemap_marker_click,{
-  #   Id.rm_c <- which(point_marker$Id == input$statemap_marker_click$id)
-  #   if(length(Id.rm_c)){
-  #     point_marker <- lapply(point_marker, function(x) x[-Id.rm_c])
-  #   }
-  #   
-  #   leafletProxy("statemap") %>% removeMarker(layerId = input$statemap_marker_click$id)
-  # })
   
+  
+  # plot my travel figure
+  output$plot_gallery <- renderUI(
+    {
+    loc <- selectmarker$name 
+    loc_path <- paste("https://raw.githubusercontent.com/EugeneHao/TravelApp/master/www/photo", 
+                        loc, "showplot.JPG", sep = "/")
+    checkurl <- RCurl::url.exists(loc_path)
+    if(checkurl == TRUE)
+    {
+        img(src = loc_path, width = 900, height = 500)
+    }
+    else
+      {
+        warning("No Picture Founded")
+      }
+  })
+  
+# show the route from input departure to input destination
+  route_record <- reactiveValues(lng = list(), 
+                                 lat = list(), 
+                                 hours = list(), 
+                                 miles = list())
+  
+  
+  observeEvent(input$draw_route, {
+    dep_ads <- input$dep_ads
+    dest_ads <- input$dest_ads
+    # if(exists("dep_ads") == 0)
+    #   dep_ads = "644 Squaw Creek Drive, Ames"
+    # if(exists("dest_ads") == 0)
+    #   dest_ads <- "Yellow Stone"
+    route1 <- route(dep_ads, dest_ads, mode = "driving", structure = "route")
+    route_name <- names(route1)
+    route_name[8] <- "lng"
+    names(route1) <- route_name
+    
+    draw_route = input$draw_route
+    route_record$lng[[draw_route]] <- route1$lng
+    route_record$lat[[draw_route]] <- route1$lat
+    route_record$hours[[draw_route]] <- route1$hours
+    route_record$miles[[draw_route]] <- route1$miles
+    
+    leafletProxy("TravelMap") %>% 
+      addPolylines(lng = route_record$lng[[draw_route]], 
+                   lat = route_record$lat[[draw_route]], weight = 3.5) %>%
+      addAwesomeMarkers(lng = route_record$lng[[draw_route]], 
+                        lat = route_record$lat[[draw_route]],
+                        layerId = route_record$hours[[draw_route]],
+                        label = route_record$miles[[draw_route]],
+                        icon =makeAwesomeIcon(icon = "car", 
+                                              markerColor = "blue", 
+                                              iconColor = "white", library = "fa")
+                        )
+      
+  })
 
-
+# add national park markers 
   output$TravelMap <- renderLeaflet({
     DrawRoute(NULL, RouteLine, TripInfor) -> map
-    map %>% addAwesomeMarkers(lng = NP$Longitude, lat = NP$Latitude, 
-                              popup = NP$Name, label = NP$Name,
-                              icon =makeAwesomeIcon(icon = "tree", markerColor = "green", 
-                                iconColor = 'white', library = "fa")) -> map
+    map %>%
+      addCircleMarkers(lat = NP$Latitude,
+                       lng = NP$Longitude,
+                       layerId = NP$Name,
+                       popup = NP$Name,
+                       color = "green",
+                       stroke = FALSE,
+                       radius = 6,
+                       fillOpacity = 0.8) -> map
 
     map 
    }) 

@@ -13,13 +13,13 @@ AddTrip <- function(olddata, newloc, travelname, type, save = FALSE)
                         lng = temp$lon, lat = temp$lat, 
                         travel = rep(travelname, length(newloc)), 
                         type = type)
-    # type: 1: National Park and other natural touristic spot
-    #       2: Museum
-    #       3: Airport
-    #       4: Restaurant
-    #       5: University
-    #       0: other
-    #       -1:Ames
+  # type: 1: National Park and other natural touristic spot
+  #       2: Museum
+  #       3: Airport
+  #       4: Restaurant
+  #       5: University
+  #       0: other
+  #       -1:Ames
   comb <- rbind(olddata, newdata)
   if(save == TRUE)
   {
@@ -58,8 +58,10 @@ DrawRoute <- function(map, Route, TripInfor)
   if(is.null(map) == T)
   {
     mapStates = maps::map("state", fill = TRUE, plot = FALSE)
-    mymap <- leaflet(mapStates) %>% addTiles() %>% 
-      addPolygons(fillColor = topo.colors(10, alpha = NULL), stroke = T,
+    mymap <- leaflet() %>%  #mapStates
+      addTiles(options = tileOptions(opacity = 0.8)) %>%
+      addPolygons(data = mapStates,
+                  fillColor = topo.colors(10, alpha = NULL), stroke = T,
                   weight = 2,
                   opacity = 1,
                   color = "white",
@@ -80,8 +82,8 @@ DrawRoute <- function(map, Route, TripInfor)
   if(is.null(Route) == F)
   {
     id <- data.frame(type = c(-1, 0, 1, 2, 3, 5), 
-                      icontype = c("home", "camera", "tree", "university",  "plane", "graduation-cap"))
-                    # icontype = rep("car", 6))
+                     icontype = c("home", "camera", "tree", "university",  "plane", "graduation-cap"))
+    # icontype = rep("car", 6))
     SplitTrip <- TripInfor %>% left_join(., id) %>% split(., TripInfor$travel) #
     
     for(i in 1:length(SplitTrip))
