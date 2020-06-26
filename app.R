@@ -93,7 +93,8 @@ server <- function(input, output, session)
   # get the selected marker's name
   observeEvent(input$TravelMap_marker_click, { # update the location selectInput on map clicks
     point <- input$TravelMap_marker_click
-    sp <- data.frame(name = point$id %>% as.numeric())
+    sp <- data.frame(name = point$id %>% as.character())
+    
     if(inner_join(sp, TripInfor) %>% dim() %>% "["(1) > 0)
     {
       selectmarker$name <- sp$name
@@ -140,8 +141,8 @@ server <- function(input, output, session)
     draw_route = input$draw_route
     route_record$lng[[draw_route]] <- route1$lng
     route_record$lat[[draw_route]] <- route1$lat
-    route_record$hours[[draw_route]] <- route1$hours
-    route_record$miles[[draw_route]] <- route1$miles
+    route_record$hours[[draw_route]] <- route1$hours %>% cumsum() %>% round(3)
+    route_record$miles[[draw_route]] <- route1$miles %>% cumsum() %>% round(3)
     
     leafletProxy("TravelMap") %>% 
       addPolylines(lng = route_record$lng[[draw_route]], 
@@ -149,9 +150,10 @@ server <- function(input, output, session)
       addAwesomeMarkers(lng = route_record$lng[[draw_route]], 
                         lat = route_record$lat[[draw_route]],
                         layerId = route_record$hours[[draw_route]],
-                        label = route_record$miles[[draw_route]],
+                        popup = paste("(miles = ", route_record$miles[[draw_route]], ", hours = ",
+                                      route_record$hours[[draw_route]], ")", sep = "") ,
                         icon =makeAwesomeIcon(icon = "car", 
-                                              markerColor = "blue", 
+                                              markerColor = "lightgray", 
                                               iconColor = "white", library = "fa")
                         )
       
